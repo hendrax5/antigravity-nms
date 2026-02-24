@@ -94,7 +94,7 @@ services:
     image: telegraf:1.30.0
     restart: always
     volumes:
-      - ./telegraf/telegraf.conf:/etc/telegraf/telegraf.conf:ro
+      - ./telegraf:/etc/telegraf:ro
     depends_on:
       - influxdb
 
