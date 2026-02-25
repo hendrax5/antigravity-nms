@@ -1,3 +1,4 @@
+from fastapi import APIRouter
 from app.api.endpoints import tenant, site, device, auth, monitoring, erp
 
 api_router = APIRouter()
