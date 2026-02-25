@@ -9,10 +9,59 @@
         />
         <SearchIcon class="w-4 h-4 text-gray-400 absolute left-3 top-3" />
       </div>
-      <button class="bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-lg text-sm font-medium shadow-sm transition flex items-center space-x-2">
+      <button @click="showAddModal = true" class="bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-lg text-sm font-medium shadow-sm transition flex items-center space-x-2">
         <PlusIcon class="w-4 h-4" />
         <span>Add Device</span>
       </button>
+    </div>
+
+    <!-- Add Device Modal -->
+    <div v-if="showAddModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div class="bg-white rounded-xl shadow-xl w-full max-w-md p-6">
+        <div class="flex justify-between items-center mb-4">
+          <h3 class="text-lg font-semibold text-gray-800">Add New Device</h3>
+          <button @click="showAddModal = false" class="text-gray-400 hover:text-gray-600">
+            <XIcon class="w-5 h-5" />
+          </button>
+        </div>
+        <form @submit.prevent="submitDevice" class="space-y-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Hostname</label>
+            <input v-model="form.hostname" type="text" required class="w-full border-gray-300 rounded-lg shadow-sm focus:ring-primary-500 focus:border-primary-500 sm:text-sm p-2 bg-gray-50 border" />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">IP Address</label>
+            <input v-model="form.ip_address" type="text" required placeholder="e.g. 192.168.1.1" class="w-full border-gray-300 rounded-lg shadow-sm focus:ring-primary-500 focus:border-primary-500 sm:text-sm p-2 bg-gray-50 border" />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Vendor</label>
+            <select v-model="form.vendor" required class="w-full border-gray-300 rounded-lg shadow-sm focus:ring-primary-500 focus:border-primary-500 sm:text-sm p-2 bg-gray-50 border">
+              <option value="" disabled>Select Vendor</option>
+              <option value="cisco_ios">Cisco IOS</option>
+              <option value="juniper_junos">Juniper Junos</option>
+              <option value="mikrotik_routeros">MikroTik RouterOS</option>
+              <option value="vyos">VyOS</option>
+            </select>
+          </div>
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Site ID</label>
+              <input v-model.number="form.site_id" type="number" required class="w-full border-gray-300 rounded-lg shadow-sm focus:ring-primary-500 focus:border-primary-500 sm:text-sm p-2 bg-gray-50 border" />
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Credential ID</label>
+              <input v-model.number="form.credential_id" type="number" required class="w-full border-gray-300 rounded-lg shadow-sm focus:ring-primary-500 focus:border-primary-500 sm:text-sm p-2 bg-gray-50 border" />
+            </div>
+          </div>
+          <div class="mt-6 flex justify-end space-x-3">
+            <button type="button" @click="showAddModal = false" class="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50">Cancel</button>
+            <button type="submit" :disabled="isSubmitting" class="px-4 py-2 bg-primary-600 text-white rounded-lg text-sm font-medium hover:bg-primary-700 flex items-center">
+              <span v-if="isSubmitting">Saving...</span>
+              <span v-else>Save Device</span>
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
 
     <!-- Inventory Table -->
@@ -39,12 +88,12 @@
                 {{ device.vendor }}
               </span>
             </td>
-            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ device.site }}</td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ device.site_id }}</td>
             <td class="px-6 py-4 whitespace-nowrap">
               <span class="px-2 flex items-center space-x-1 text-xs font-semibold rounded-full"
-                    :class="device.status === 'active' ? 'text-green-600' : 'text-red-600'">
-                <div class="w-1.5 h-1.5 rounded-full" :class="device.status === 'active' ? 'bg-green-500' : 'bg-red-500'"></div>
-                <span>{{ device.status === 'active' ? 'Online' : 'Offline' }}</span>
+                    :class="device.status === 'online' ? 'text-green-600' : 'text-gray-600'">
+                <div class="w-1.5 h-1.5 rounded-full" :class="device.status === 'online' ? 'bg-green-500' : 'bg-gray-500'"></div>
+                <span>{{ device.status === 'online' ? 'Online' : 'Unknown' }}</span>
               </span>
             </td>
             <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
@@ -59,13 +108,71 @@
 </template>
 
 <script setup>
-import { SearchIcon, PlusIcon } from 'lucide-vue-next'
-import { ref } from 'vue'
+import { SearchIcon, PlusIcon, XIcon } from 'lucide-vue-next'
+import { ref, onMounted } from 'vue'
 
-const devices = ref([
-  { id: 1, hostname: 'CORE-RT-01', ip_address: '10.0.0.1', vendor: 'Cisco IOS', site: 'HQ-Jakarta', status: 'active' },
-  { id: 2, hostname: 'ACC-SW-04', ip_address: '10.0.4.15', vendor: 'Juniper Junos', site: 'Branch-Bandung', status: 'active' },
-  { id: 3, hostname: 'FW-MAIN-01', ip_address: '10.0.0.254', vendor: 'VyOS', site: 'HQ-Jakarta', status: 'offline' },
-  { id: 4, hostname: 'EDGE-RT-02', ip_address: '10.1.0.1', vendor: 'Huawei VRP', site: 'DC-Singapore', status: 'active' },
-])
+const devices = ref([])
+const showAddModal = ref(false)
+const isSubmitting = ref(false)
+
+const form = ref({
+  hostname: '',
+  ip_address: '',
+  vendor: '',
+  site_id: 1,
+  credential_id: 1
+})
+
+const getApiPath = (path) => {
+  // If running via npm run dev locally without Nginx proxy, 
+  // point directly to the backend URL on port 8000.
+  // We use relative path for production where Nginx routes /api/v1 to backend.
+  const isDev = window.location.hostname === 'localhost' && window.location.port !== '80';
+  return isDev ? `http://localhost:8000${path}` : path;
+}
+
+const fetchDevices = async () => {
+  try {
+    const res = await fetch(getApiPath('/api/v1/devices/'))
+    if (res.ok) {
+      devices.value = await res.json()
+    } else {
+      console.error('Failed to load devices', await res.text())
+    }
+  } catch (err) {
+    console.error('Network error fetching devices:', err)
+  }
+}
+
+const submitDevice = async () => {
+  try {
+    isSubmitting.value = true
+    const res = await fetch(getApiPath('/api/v1/devices/'), {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(form.value)
+    })
+    
+    if (res.ok) {
+      showAddModal.value = false
+      form.value = { hostname: '', ip_address: '', vendor: '', site_id: 1, credential_id: 1 }
+      await fetchDevices()
+      alert('Device added successfully!')
+    } else {
+      const errorData = await res.json()
+      alert(`Error creating device: ${JSON.stringify(errorData)}`)
+    }
+  } catch (err) {
+    console.error('Error submitting device:', err)
+    alert('Network error. Check console.')
+  } finally {
+    isSubmitting.value = false
+  }
+}
+
+onMounted(() => {
+  fetchDevices()
+})
 </script>
