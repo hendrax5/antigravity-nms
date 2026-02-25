@@ -7,10 +7,14 @@ class DeviceBase(BaseModel):
     ip_address: str
     vendor: str
     site_id: int
-    credential_id: int
+    credential_id: Optional[int] = None
+    connection_method: str = "ssh"
+    port: int = 22
+    snmp_community: Optional[str] = None
 
 class DeviceCreate(DeviceBase):
-    pass
+    ssh_username: Optional[str] = None
+    ssh_password: Optional[str] = None
 
 class DeviceUpdate(BaseModel):
     hostname: Optional[str] = None
@@ -18,6 +22,9 @@ class DeviceUpdate(BaseModel):
     vendor: Optional[str] = None
     site_id: Optional[int] = None
     credential_id: Optional[int] = None
+    connection_method: Optional[str] = None
+    port: Optional[int] = None
+    snmp_community: Optional[str] = None
     status: Optional[str] = None
 
 class DeviceResponse(DeviceBase):

@@ -15,7 +15,34 @@ router = APIRouter()
 
 @router.post("/", response_model=DeviceResponse)
 def create_device(device: DeviceCreate, db: Session = Depends(get_db)):
-    new_device = Device(**device.model_dump())
+    from app.models.site import Site
+    site = db.query(Site).filter(Site.id == device.site_id).first()
+    if not site:
+        raise HTTPException(status_code=400, detail="Site ID not found")
+
+    device_dict = device.model_dump(exclude={"ssh_username", "ssh_password"})
+    
+    if device.connection_method == "ssh":
+        if not device.ssh_username or not device.ssh_password:
+             raise HTTPException(status_code=400, detail="SSH username and password are required for SSH connection")
+        
+        new_cred = CredentialProfile(
+            tenant_id=site.tenant_id,
+            name=f"Auto-{device.hostname}-SSH",
+            username=device.ssh_username,
+            encrypted_password=device.ssh_password
+        )
+        db.add(new_cred)
+        db.flush() 
+        device_dict["credential_id"] = new_cred.id
+    elif device.connection_method == "snmp":
+        if not device.snmp_community:
+            raise HTTPException(status_code=400, detail="SNMP Community is required for SNMP connection")
+        device_dict["credential_id"] = None
+    else:
+        raise HTTPException(status_code=400, detail="Invalid connection method")
+
+    new_device = Device(**device_dict)
     db.add(new_device)
     db.commit()
     db.refresh(new_device)
@@ -233,3 +260,20 @@ def get_device_backup_content(device_id: int, commit_hash: str, db: Session = De
         raise HTTPException(status_code=404, detail="Configuration file not found for this commit")
         
     return {"device_id": device.id, "commit_hash": commit_hash, "content": content}
+
+@router.get("/db/migrate")
+def trigger_backend_migration():
+    """
+    Temporary endpoint to trigger database migration manually in Coolify since port 5432 is blocked.
+    """
+    import os
+    import importlib.util
+    try:
+        migrate_path = os.path.join(os.path.dirname(__file__), "../../../migrate_db.py")
+        spec = importlib.util.spec_from_file_location("migrate_db", migrate_path)
+        migrate_module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(migrate_module)
+        migrate_module.run_migration()
+        return {"status": "Migration script executed successfully."}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Migration failed: {e}")
