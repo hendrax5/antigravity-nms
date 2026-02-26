@@ -8,6 +8,27 @@ from app.schemas.site import SiteCreate, SiteResponse, SiteUpdate
 
 router = APIRouter()
 
+@router.get("/seed")
+def seed_default_site(db: Session = Depends(get_db)):
+    from app.models.tenant import Tenant
+    # Check if Tenant exists
+    tenant = db.query(Tenant).filter(Tenant.name == "Default Tenant").first()
+    if not tenant:
+        tenant = Tenant(name="Default Tenant", company="Default Company")
+        db.add(tenant)
+        db.commit()
+        db.refresh(tenant)
+        
+    # Check if Site exists
+    site = db.query(Site).filter(Site.name == "Default Site").first()
+    if not site:
+        site = Site(name="Default Site", location="HQ", tenant_id=tenant.id)
+        db.add(site)
+        db.commit()
+        db.refresh(site)
+        
+    return {"message": "Database seeded successfully", "tenant_id": tenant.id, "site_id": site.id}
+
 @router.post("/", response_model=SiteResponse)
 def create_site(site: SiteCreate, db: Session = Depends(get_db)):
     new_site = Site(**site.model_dump())
